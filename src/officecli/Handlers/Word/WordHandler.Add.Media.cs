@@ -226,8 +226,10 @@ public partial class WordHandler
 
         var imgDocPropId = NextDocPropId();
         Run imgRun;
+        bool isInline;
         if (properties.TryGetValue("anchor", out var anchorVal) && IsTruthy(anchorVal))
         {
+            isInline = false;
             var wrapType = properties.GetValueOrDefault("wrap", "none");
             long hPos = properties.TryGetValue("hposition", out var hPosStr) ? ParseEmu(hPosStr) : 0;
             long vPos = properties.TryGetValue("vposition", out var vPosStr) ? ParseEmu(vPosStr) : 0;
@@ -242,6 +244,7 @@ public partial class WordHandler
         }
         else
         {
+            isInline = true;
             imgRun = CreateImageRun(relId, cxEmu, cyEmu, altText, imgDocPropId);
         }
 
@@ -271,6 +274,9 @@ public partial class WordHandler
             {
                 existingPara.AppendChild(imgRun);
             }
+            // Prevent inherited exact line spacing from clipping the inline image.
+            if (isInline)
+                EnsureAutoLineSpacingForInlineImage(existingPara);
             imgPara = existingPara;
             var imgRunIdx = existingPara.Elements<Run>().ToList().IndexOf(imgRun) + 1;
             resultPath = $"{parentPath}/r[{imgRunIdx}]";
@@ -282,6 +288,9 @@ public partial class WordHandler
             if (firstCellPara != null && !firstCellPara.Elements<Run>().Any())
             {
                 firstCellPara.AppendChild(imgRun);
+                // Prevent inherited exact line spacing from clipping the inline image.
+                if (isInline)
+                    EnsureAutoLineSpacingForInlineImage(firstCellPara);
                 imgPara = firstCellPara;
             }
             else
@@ -536,6 +545,7 @@ public partial class WordHandler
             {
                 existingPara.AppendChild(oleRun);
             }
+            EnsureAutoLineSpacingForInlineImage(existingPara);
             var olePIdx = 1;
             foreach (var para in parent.Parent?.Elements<Paragraph>() ?? Enumerable.Empty<Paragraph>())
             {
@@ -552,6 +562,7 @@ public partial class WordHandler
             if (firstCellPara != null && !firstCellPara.Elements<Run>().Any())
             {
                 firstCellPara.AppendChild(oleRun);
+                EnsureAutoLineSpacingForInlineImage(firstCellPara);
                 olePara = firstCellPara;
             }
             else
@@ -588,5 +599,51 @@ public partial class WordHandler
             resultPath = $"{parentPath}/{BuildParaPathSegment(olePara, olePIdx)}/r[1]";
         }
         return resultPath;
+    }
+
+    /// <summary>
+    /// Ensure that <paramref name="para"/> does not use exact line spacing,
+    /// which clips inline images to the text line height making them invisible.
+    /// Resolves the effective lineRule from direct formatting → style chain → docDefaults;
+    /// if exact, adds a direct override to auto (single spacing).
+    /// </summary>
+    private void EnsureAutoLineSpacingForInlineImage(Paragraph para)
+    {
+        var pProps = para.ParagraphProperties;
+        var directSpacing = pProps?.SpacingBetweenLines;
+
+        var directRule = directSpacing?.LineRule?.Value;
+
+        // Direct formatting already specifies a non-exact rule → safe.
+        if (directRule == LineSpacingRuleValues.Auto || directRule == LineSpacingRuleValues.AtLeast)
+            return;
+
+        // Direct formatting is exact → override to auto.
+        if (directRule == LineSpacingRuleValues.Exact)
+        {
+            directSpacing!.LineRule = LineSpacingRuleValues.Auto;
+            directSpacing.Line = "240";
+            return;
+        }
+
+        // No direct line rule — resolve from style chain + docDefaults.
+        var styleId = pProps?.ParagraphStyleId?.Val?.Value;
+        var styleSpacing = ResolveSpacingFromStyle(styleId);
+        var effectiveRule = styleSpacing?.LineRule?.InnerText;
+
+        if (effectiveRule == null)
+        {
+            var docDefaults = _doc.MainDocumentPart?.StyleDefinitionsPart?.Styles?.DocDefaults;
+            effectiveRule = docDefaults?.ParagraphPropertiesDefault
+                ?.ParagraphPropertiesBaseStyle?.SpacingBetweenLines?.LineRule?.InnerText;
+        }
+
+        if (effectiveRule == "exact")
+        {
+            pProps ??= para.PrependChild(new ParagraphProperties());
+            var spacing = pProps.SpacingBetweenLines ??= new SpacingBetweenLines();
+            spacing.Line = "240";
+            spacing.LineRule = LineSpacingRuleValues.Auto;
+        }
     }
 }
