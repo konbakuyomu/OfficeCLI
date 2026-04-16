@@ -239,15 +239,17 @@ public partial class WordHandler
 
         // Detect PAGE field in footer and replace with placeholder
         // Footer typically contains: <span ...>1</span> where "1" is the cached PAGE field value
-        // We replace single-digit page numbers in the footer with a placeholder for per-page substitution
+        // The cached value may be a digit, Roman numeral (IV), or other text.
+        // We replace ALL matching spans so duplicate page-number paragraphs are handled.
         var footerHasPageNum = footerHtml.Contains("PAGE") || !string.IsNullOrEmpty(footerHtml);
-        // Match a single-digit-only run rendered as either <span> or <p>.
-        // The footer's PAGE field is typically a single run; the tag name
-        // depends on whether the run carries rPr styling.
-        // Wrap the matched digit run in a sentinel span so the per-page
-        // paginate JS can locate PAGE/NUMPAGES fields without clobbering
-        // unrelated digit-only content (e.g. "2026", "5 USD", chapter ids).
-        var pageNumPattern = new Regex(@"(<(?:span|p)[^>]*>)\s*\d+\s*(</(?:span|p)>)");
+        // Match a single-digit-only or Roman-numeral run rendered as either <span> or <p>.
+        // The footer's PAGE field is typically a single run; the tag name depends on
+        // whether the run carries rPr styling. Roman numerals cover pgNumType@fmt=
+        // upperRoman/lowerRoman where the cached PAGE field is "IV", "xii", etc.
+        // Wrap the matched run in a sentinel span so the per-page paginate JS can
+        // locate PAGE/NUMPAGES fields without clobbering unrelated digit-only
+        // content (e.g. "2026", "5 USD", chapter ids).
+        var pageNumPattern = new Regex(@"(<(?:span|p)[^>]*>)\s*(?:\d+|[IVXLCDM]+|[ivxlcdm]+)\s*(</(?:span|p)>)");
         var footerTemplate = pageNumPattern.Replace(footerHtml,
             "$1<span class=\"page-num-field\"><!--PAGE_NUM--></span>$2", 1);
         var footerTemplateWithTotal = pageNumPattern.Replace(footerTemplate,
@@ -546,7 +548,7 @@ public partial class WordHandler
       np.appendChild(nb);
       // Clone footer into new page
       var nf=document.createElement('div');
-      nf.innerHTML=ftpl.replace('<!--PAGE_NUM-->',(pi+2).toString());
+      nf.innerHTML=ftpl.replaceAll('<!--PAGE_NUM-->',(pi+2).toString());
       if(nf.firstChild)np.appendChild(nf.firstChild);
       nw.appendChild(np);
       var parentWrapper=page.closest('.page-wrapper');
