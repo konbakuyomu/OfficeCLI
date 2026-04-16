@@ -180,6 +180,8 @@ public partial class WordHandler
         var rows = table.Elements<TableRow>().ToList();
         var totalRows = rows.Count;
         var totalCols = tblGrid?.Elements<GridColumn>().Count() ?? rows.FirstOrDefault()?.Elements<TableCell>().Count() ?? 0;
+        // Counters for auto-numbering paragraphs inside table cells (e.g. sequence number columns)
+        Dictionary<(int numId, int ilvl), int>? tblNumCounters = null;
 
         for (int rowIdx = 0; rowIdx < totalRows; rowIdx++)
         {
@@ -241,9 +243,35 @@ public partial class WordHandler
 
                     if (runs.Count == 0 && string.IsNullOrWhiteSpace(text))
                     {
-                        // empty cell paragraph — skip but preserve spacing between paragraphs
-                        if (pi > 0 && pi < cellParagraphs.Count - 1)
-                            sb.Append("<br>");
+                        // Check for auto-numbering on the empty paragraph (e.g. table sequence numbers)
+                        var cellNumProps = cellPara.ParagraphProperties?.NumberingProperties;
+                        var cellNumId = cellNumProps?.NumberingId?.Val?.Value;
+                        if (cellNumId != null && cellNumId != 0)
+                        {
+                            var cellIlvl = cellNumProps?.NumberingLevelReference?.Val?.Value ?? 0;
+                            var cellLvlText = GetLevelText(cellNumId.Value, cellIlvl);
+                            // Increment counter for this numId
+                            var counterKey = (cellNumId.Value, cellIlvl);
+                            tblNumCounters ??= new Dictionary<(int, int), int>();
+                            tblNumCounters[counterKey] = tblNumCounters.GetValueOrDefault(counterKey, 0) + 1;
+                            if (!string.IsNullOrEmpty(cellLvlText))
+                            {
+                                var numStr = cellLvlText;
+                                numStr = numStr.Replace($"%{cellIlvl + 1}", tblNumCounters[counterKey].ToString());
+                                var pCss = GetParagraphInlineCss(cellPara);
+                                if (!string.IsNullOrEmpty(pCss))
+                                    sb.Append($"<div style=\"{pCss}\">");
+                                sb.Append(HtmlEncode(numStr));
+                                if (!string.IsNullOrEmpty(pCss))
+                                    sb.Append("</div>");
+                            }
+                        }
+                        else
+                        {
+                            // empty cell paragraph — skip but preserve spacing between paragraphs
+                            if (pi > 0 && pi < cellParagraphs.Count - 1)
+                                sb.Append("<br>");
+                        }
                     }
                     else
                     {

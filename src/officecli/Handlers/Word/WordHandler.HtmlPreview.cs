@@ -1519,6 +1519,10 @@ public partial class WordHandler
                     var numFmt = GetNumberingFormat(numId, ilvl);
                     var lvlText = GetLevelText(numId, ilvl);
                     var isMultiLevel = lvlText != null && System.Text.RegularExpressions.Regex.Matches(lvlText, @"%\d").Count > 1;
+                    // Detect custom lvlText that HTML <ol> cannot represent (e.g. "%1)" "%1、")
+                    // Standard patterns like "%1" or "%1." can be handled by <ol> default markers
+                    var hasCustomLvlText = !isMultiLevel && listStyle != "bullet" && lvlText != null
+                        && !System.Text.RegularExpressions.Regex.IsMatch(lvlText, @"^%\d+\.?\s*$");
                     var picBulletUri = listStyle == "bullet" ? GetPicBulletDataUri(numId, ilvl) : null;
                     var tag = listStyle == "bullet" ? "ul" : "ol";
 
