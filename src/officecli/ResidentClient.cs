@@ -153,7 +153,7 @@ public static class ResidentClient
     // On Linux/macOS, StreamReader/StreamWriter work fine and are faster (buffered
     // reads), so we keep using them.
 
-    private const int MaxLineLength = 1_048_576; // 1 MB safety limit
+    private const int MaxLineLength = 67_108_864; // 64 MB — raw /document XML responses can be very large
 
     private static void PipeWriteLine(Stream pipe, string line)
     {
@@ -175,21 +175,27 @@ public static class ResidentClient
             using var reader = new StreamReader(pipe, Encoding.UTF8, leaveOpen: true);
             return reader.ReadLine();
         }
-        var buffer = new byte[1];
-        var lineBytes = new List<byte>(256);
+        // Use a larger read buffer for performance (raw XML responses can be multi-MB)
+        var chunk = new byte[8192];
+        using var ms = new MemoryStream(4096);
         while (true)
         {
-            var bytesRead = pipe.Read(buffer, 0, 1);
-            if (bytesRead == 0) return lineBytes.Count > 0 ? Encoding.UTF8.GetString(lineBytes.ToArray()) : null;
-            if (buffer[0] == (byte)'\n')
+            var bytesRead = pipe.Read(chunk, 0, chunk.Length);
+            if (bytesRead == 0) return ms.Length > 0 ? Encoding.UTF8.GetString(ms.GetBuffer(), 0, (int)ms.Length) : null;
+            // Scan for newline in the chunk
+            for (int i = 0; i < bytesRead; i++)
             {
-                if (lineBytes.Count > 0 && lineBytes[^1] == (byte)'\r')
-                    lineBytes.RemoveAt(lineBytes.Count - 1);
-                return Encoding.UTF8.GetString(lineBytes.ToArray());
+                if (chunk[i] == (byte)'\n')
+                {
+                    ms.Write(chunk, 0, i);
+                    var len = (int)ms.Length;
+                    if (len > 0 && ms.GetBuffer()[len - 1] == (byte)'\r') len--;
+                    return Encoding.UTF8.GetString(ms.GetBuffer(), 0, len);
+                }
             }
-            if (lineBytes.Count >= MaxLineLength)
+            ms.Write(chunk, 0, bytesRead);
+            if (ms.Length >= MaxLineLength)
                 return null;
-            lineBytes.Add(buffer[0]);
         }
     }
 }

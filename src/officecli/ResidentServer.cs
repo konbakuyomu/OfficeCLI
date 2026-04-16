@@ -1062,7 +1062,7 @@ public class ResidentServer : IDisposable
     // preview.  Raw byte I/O avoids the issue.
     // On Linux/macOS, StreamReader/StreamWriter work fine and are faster.
 
-    private const int MaxLineLength = 1_048_576; // 1 MB safety limit
+    private const int MaxLineLength = 67_108_864; // 64 MB — raw XML payloads can be very large
 
     private static async Task<string?> ReadLineFromPipeAsync(Stream pipe, CancellationToken token)
     {
