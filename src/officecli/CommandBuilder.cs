@@ -278,6 +278,55 @@ static partial class CommandBuilder
     private const int ResidentBusyConnectTimeoutMs = 30000;
     private const int ResidentBusyMaxRetries = 3;
 
+    /// <summary>
+    /// Normalize a path argument that may have been mangled by MSYS/Git Bash path conversion.
+    /// Git Bash converts "/document" → "D:/scoop/apps/git/2.53.0.3/document".
+    /// Also handles the "//" double-slash workaround: "//document" → "/document".
+    /// </summary>
+    internal static string NormalizeMsysPath(string path)
+    {
+        // Double-slash workaround: //document → /document
+        if (path.StartsWith("//") && path.Length > 2 && path[2] != '/')
+            return path[1..];
+
+        // Already a valid path (starts with / and no drive letter)
+        if (path.StartsWith('/') && (path.Length < 3 || path[1] != ':'))
+            return path;
+
+        // Detect MSYS conversion: contains drive letter (e.g. "D:/...")
+        if (path.Length > 2 && path[1] == ':')
+        {
+            // Find the first path segment that looks like an officecli DOM/part path.
+            // The MSYS prefix is something like "D:/scoop/apps/git/2.53.0.3/" — skip it.
+            var segments = path.Split('/');
+            for (int s = 2; s < segments.Length; s++)
+            {
+                var seg = segments[s].ToLowerInvariant();
+                // Brackets/@ indicate XPath-like selectors; known names are part/DOM roots
+                if (seg.Contains('[') || seg.Contains('@')
+                    || seg is "body" or "document" or "styles" or "settings" or "numbering"
+                    or "comments" or "header" or "footer" or "chart" or "word"
+                    or "workbook" or "sharedstrings" or "presentation" or "slide"
+                    or "slidemaster" or "slidelayout" or "noteslide" or "xl" or "ppt"
+                    or "p" or "table" or "tbl" or "tr" or "tc" or "r" or "shape"
+                    or "selected")
+                {
+                    return "/" + string.Join("/", segments.Skip(s));
+                }
+            }
+            // Fallback: take the last segment
+            var lastSlash = path.LastIndexOf('/');
+            if (lastSlash >= 0)
+                return "/" + path[(lastSlash + 1)..];
+        }
+
+        // Bare name without slash (e.g. "document") — prepend /
+        if (!path.StartsWith('/'))
+            return "/" + path;
+
+        return path;
+    }
+
     internal static int? TryResident(string filePath, Action<ResidentRequest> configure, bool json = false)
     {
         // Step 1: does a resident own this file? Probe via the -ping pipe,

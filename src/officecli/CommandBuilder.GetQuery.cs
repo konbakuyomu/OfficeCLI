@@ -28,7 +28,7 @@ static partial class CommandBuilder
         getCommand.SetAction(result => { var json = result.GetValue(jsonOption); return SafeRun(() =>
         {
             var file = result.GetValue(getFileArg)!;
-            var path = result.GetValue(pathArg)!;
+            var path = NormalizeMsysPath(result.GetValue(pathArg)!);
             var depth = result.GetValue(depthOpt);
             var savePath = result.GetValue(saveOpt);
 

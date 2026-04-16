@@ -31,7 +31,7 @@ static partial class CommandBuilder
         rawCommand.SetAction(result => { var json = result.GetValue(jsonOption); return SafeRun(() =>
         {
             var file = result.GetValue(rawFileArg)!;
-            var partPath = NormalizeMsysPartPath(result.GetValue(rawPathArg)!);
+            var partPath = NormalizeMsysPath(result.GetValue(rawPathArg)!);
             var startRow = result.GetValue(rawStartOpt);
             var endRow = result.GetValue(rawEndOpt);
             var rawColsStr = result.GetValue(rawColsOpt);
@@ -76,7 +76,7 @@ static partial class CommandBuilder
         rawSetCommand.SetAction(result => { var json = result.GetValue(jsonOption); return SafeRun(() =>
         {
             var file = result.GetValue(rawSetFileArg)!;
-            var partPath = NormalizeMsysPartPath(result.GetValue(rawSetPartArg)!);
+            var partPath = NormalizeMsysPath(result.GetValue(rawSetPartArg)!);
             var xpath = result.GetValue(rawSetXpathOpt)!;
             var action = result.GetValue(rawSetActionOpt)!;
             var xml = result.GetValue(rawSetXmlOpt);
@@ -150,29 +150,4 @@ static partial class CommandBuilder
         return addPartCommand;
     }
 
-    /// <summary>
-    /// Normalize a part path that may have been mangled by MSYS/Git Bash path conversion.
-    /// Git Bash converts "/document" → "D:/scoop/apps/git/2.53.0.3/document".
-    /// This extracts the last path component and restores the leading slash.
-    /// </summary>
-    private static string NormalizeMsysPartPath(string partPath)
-    {
-        // Already a valid part path (starts with / and no drive letter)
-        if (partPath.StartsWith('/') && (partPath.Length < 3 || partPath[1] != ':'))
-            return partPath;
-
-        // Detect MSYS conversion: contains drive letter (e.g. "D:/...")
-        if (partPath.Length > 2 && partPath[1] == ':')
-        {
-            var lastSlash = partPath.LastIndexOf('/');
-            if (lastSlash >= 0)
-                return "/" + partPath[(lastSlash + 1)..];
-        }
-
-        // Bare name without slash (e.g. "document") — prepend /
-        if (!partPath.StartsWith('/'))
-            return "/" + partPath;
-
-        return partPath;
-    }
 }

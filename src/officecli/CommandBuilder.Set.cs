@@ -26,7 +26,7 @@ static partial class CommandBuilder
         setCommand.SetAction(result => { var json = result.GetValue(jsonOption); return SafeRun(() =>
         {
             var file = result.GetValue(setFileArg)!;
-            var path = result.GetValue(setPathArg)!;
+            var path = NormalizeMsysPath(result.GetValue(setPathArg)!);
             var props = result.GetValue(propsOpt);
             var force = result.GetValue(forceOption);
 

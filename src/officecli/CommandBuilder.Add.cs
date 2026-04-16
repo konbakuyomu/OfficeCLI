@@ -36,7 +36,7 @@ static partial class CommandBuilder
         addCommand.SetAction(result => { var json = result.GetValue(jsonOption); return SafeRun(() =>
         {
             var file = result.GetValue(addFileArg)!;
-            var parentPath = result.GetValue(addParentPathArg)!;
+            var parentPath = NormalizeMsysPath(result.GetValue(addParentPathArg)!);
             var type = result.GetValue(addTypeOpt);
             var from = result.GetValue(addFromOpt);
             var index = result.GetValue(addIndexOpt);
@@ -203,7 +203,7 @@ static partial class CommandBuilder
         removeCommand.SetAction(result => { var json = result.GetValue(jsonOption); return SafeRun(() =>
         {
             var file = result.GetValue(removeFileArg)!;
-            var path = result.GetValue(removePathArg)!;
+            var path = NormalizeMsysPath(result.GetValue(removePathArg)!);
 
             if (TryResident(file.FullName, req =>
             {
@@ -250,7 +250,7 @@ static partial class CommandBuilder
         moveCommand.SetAction(result => { var json = result.GetValue(jsonOption); return SafeRun(() =>
         {
             var file = result.GetValue(moveFileArg)!;
-            var path = result.GetValue(movePathArg)!;
+            var path = NormalizeMsysPath(result.GetValue(movePathArg)!);
             var to = result.GetValue(moveToOpt);
             var index = result.GetValue(moveIndexOpt);
             var after = result.GetValue(moveAfterOpt);
@@ -307,8 +307,8 @@ static partial class CommandBuilder
         swapCommand.SetAction(result => { var json = result.GetValue(jsonOption); return SafeRun(() =>
         {
             var file = result.GetValue(swapFileArg)!;
-            var path1 = result.GetValue(swapPath1Arg)!;
-            var path2 = result.GetValue(swapPath2Arg)!;
+            var path1 = NormalizeMsysPath(result.GetValue(swapPath1Arg)!);
+            var path2 = NormalizeMsysPath(result.GetValue(swapPath2Arg)!);
 
             if (TryResident(file.FullName, req =>
             {
